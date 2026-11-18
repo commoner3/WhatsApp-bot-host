@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bot Host Admin</title>
+<script>
+const API='https://api.yourdomain.com';
+</script>
+<style>
+:root{--bg:#f3f4f6;--card:#fff;--text:#111827;--muted:#6b7280;--blue:#2563eb;--line:#e5e7eb;--red:#dc2626}*{box-sizing:border-box}body{margin:0;font-family:system-ui,sans-serif;background:var(--bg);color:var(--text)}header{background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}header b{color:var(--blue);font-size:18px}main{max-width:640px;margin:0 auto;padding:16px}.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:12px}input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;font-size:16px;margin-top:8px}button{padding:10px 14px;border:0;border-radius:10px;font-weight:600;background:var(--blue);color:#fff;cursor:pointer}.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}.danger{background:var(--red)}.tabs{display:flex;gap:8px;margin-bottom:14px}.tabs button{flex:1}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.muted{color:var(--muted)}.top{display:flex;justify-content:space-between;align-items:center;gap:8px}.row{display:flex;gap:8px;margin-top:10px}#toast{position:fixed;left:16px;right:16px;bottom:20px;max-width:608px;margin:auto;padding:14px;border-radius:12px;background:#111827;color:#fff;display:none;text-align:center}
+</style>
+</head>
+<body>
+<header><b>Bot Host Admin</b></header><main id="app"></main><div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s);const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]);const token=localStorage.getItem('token');let tab='overview';
+function toast(msg){const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(()=>t.style.display='none',4000)}
+async function api(path,method='GET',body){const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},body:body?JSON.stringify(body):undefined});const data=await r.json().catch(()=>({}));if(!r.ok)throw new Error(data.error||'Request failed');return data}
+function shell(inner){const names={overview:'Overview',users:'Users',bots:'Bots',coupons:'Coupons'};$('#app').innerHTML='<div class="tabs">'+Object.keys(names).map(t=>'<button class="'+(tab===t?'':'ghost')+'" onclick="go(\''+t+'\')">'+names[t]+'</button>').join('')+'</div>'+inner}
+async function go(t){tab=t;try{if(t==='overview'){const s=await api('/api/admin/stats');shell('<div class="grid"><div class="card"><b>'+s.users+'</b><br><span class="muted">Users</span></div><div class="card"><b>'+s.bots+'</b><br><span class="muted">Bots</span></div><div class="card"><b>'+s.running+'</b><br><span class="muted">Running</span></div><div class="card"><b>'+s.free_running+' / '+s.maxFree+'</b><br><span class="muted">Free slots</span></div></div>')}if(t==='users')await loadUsers('');if(t==='bots'){const bots=await api('/api/admin/bots');shell(bots.length?bots.map(b=>'<div class="card"><div class="top"><b>'+esc(b.name)+'</b><span>'+esc(b.status)+'</span></div><div class="muted">'+esc(b.user_email)+' · '+esc(b.owner_number)+'</div><div class="row"><button class="ghost" onclick="stopBot(\''+b.id+'\')">Stop</button><button class="danger" onclick="delBot(\''+b.id+'\')">Delete</button></div></div>').join(''):'<div class="card muted">No bots yet.</div>')}if(t==='coupons'){const list=await api('/api/admin/coupons');shell('<div class="card"><b>New coupon</b><input id="cd" placeholder="Code (leave empty for random)"><input id="cc" type="number" placeholder="Coins"><input id="cu" type="number" placeholder="Uses"><input id="ce" type="number" placeholder="Expires in days"><div class="row"><button onclick="makeCoupon()">Create coupon</button></div></div>'+list.map(c=>'<div class="card top"><div><b>'+esc(c.code)+'</b><div class="muted">'+c.coins+' coins · '+c.used_count+'/'+c.max_uses+' used</div></div><button class="danger" onclick="delCoupon('+c.id+')">Delete</button></div>').join(''))}}catch(e){$('#app').innerHTML='<div class="card">'+esc(e.message)+'<br><span class="muted">Sign in on the main site and use an admin account.</span></div>'}}
+async function loadUsers(q){const users=await api('/api/admin/users?q='+encodeURIComponent(q));shell('<div class="card"><input id="q" placeholder="Search users" value="'+esc(q)+'"></div>'+users.map(u=>'<div class="card"><div class="top"><b>'+esc(u.name)+'</b><span>'+esc(u.role)+'</span></div><div class="muted">'+esc(u.email)+'</div><div class="row"><button onclick="coins(\''+u.id+'\')">Add/remove coins</button></div></div>').join(''))}
+async function coins(id){const v=prompt('Coins to add (use minus to remove):');if(v===null)return;const amount=parseInt(v,10);if(!Number.isInteger(amount)||amount===0)return toast('Enter a whole number');try{const r=await api('/api/admin/users/'+id+'/coins','POST',{amount});toast('New balance: '+r.coins)}catch(e){toast(e.message)}}
+async function stopBot(id){try{await api('/api/admin/bots/'+id+'/stop','POST');toast('Bot stopped');go('bots')}catch(e){toast(e.message)}}
+async function delBot(id){if(!confirm('Delete this bot?'))return;try{await api('/api/admin/bots/'+id,'DELETE');toast('Bot deleted');go('bots')}catch(e){toast(e.message)}}
+async function makeCoupon(){try{const r=await api('/api/admin/coupons','POST',{code:$('#cd').value.trim(),coins:$('#cc').value,maxUses:$('#cu').value,expireDays:$('#ce').value});toast('Created '+r.code);go('coupons')}catch(e){toast(e.message)}}
+async function delCoupon(id){if(!confirm('Delete this coupon?'))return;try{await api('/api/admin/coupons/'+id,'DELETE');go('coupons')}catch(e){toast(e.message)}}
+if(!token)$('#app').innerHTML='<div class="card">Please log in on the main site first.</div>';else go('overview');
+</script>
+</body>
+</html>
