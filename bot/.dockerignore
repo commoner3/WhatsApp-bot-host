@@ -3,3 +3,4 @@ session
 .git
 .env
 *.log
+coverage

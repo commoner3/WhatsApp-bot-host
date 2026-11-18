@@ -1,0 +1,11 @@
+{
+  "name": "whatsapp-bot-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "node start.js",
+    "check": "node --check index.js && node --check start.js"
+  },
+  "engines": { "node": ">=18" }
+}
